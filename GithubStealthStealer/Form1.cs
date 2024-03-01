@@ -114,6 +114,11 @@ namespace GithubStealthStealer
 
                 foreach (var file in Directory.GetFiles(sourceRootFolder))
                 {
+                    if (checkBox1.Checked && Path.GetFileName(file).ToLower() == "readme.md")
+                    {
+                        continue;
+                    }
+
                     runOneOff($"copy /Y \"{file}\" \"{Path.Combine(destinationRootFolder, Path.GetFileName(file))}\"");
                 }
             }
