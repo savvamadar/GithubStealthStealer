@@ -149,11 +149,13 @@ namespace GithubStealthStealer
 
             public int startHour = 9;
             public int endHour = 23;
+
+            public string uuid = "";
         }
 
         private bool DeleteLocalTestRepo()
         {
-            return DeleteDir(GetRepoName());
+            return DeleteDir(GetRepoName(true));
         }
 
         public Random rnd = new Random();
@@ -346,10 +348,29 @@ namespace GithubStealthStealer
             linkType_TextBox["http"].Text = textBox1.Text + ".git";
         }
 
-        private string GetRepoName()
+        public string GetUUID()
+        {
+            if (progress.uuid == "")
+            {
+                string[] dash_seperated = Guid.NewGuid().ToString().Split('-');
+                progress.uuid = dash_seperated[dash_seperated.Length - 1];
+            }
+
+            return progress.uuid;
+        }
+
+        private string GetRepoName(bool original)
         {
             string[] urlSplit = textBox1.Text.Split('/');
-            return urlSplit[urlSplit.Length - 1];
+            if (original)
+            {
+                return urlSplit[urlSplit.Length - 1];
+            }
+            else
+            {
+                return urlSplit[urlSplit.Length - 1]+"-"+ GetUUID();
+            }
+            
         }
 
         private void Log(object o, bool newline = true)
@@ -563,6 +584,7 @@ namespace GithubStealthStealer
             {
                 progress.currentStep = 0;
                 progress.masterLink = textBox1.Text;
+                progress.uuid = GetUUID();
             }
 
             textBox1.ReadOnly = true;
@@ -578,8 +600,8 @@ namespace GithubStealthStealer
 
             if (progress.currentStep == 0)
             {
-                DeleteDir(Path.Combine(Path.Combine("original", "main_branch"),GetRepoName()));
-                Log("Cloning " + GetRepoName()+" | may hang...");
+                DeleteDir(Path.Combine(Path.Combine("original", "main_branch"),GetRepoName(true)));
+                Log("Cloning " + GetRepoName(true)+" | may hang...");
                 Log(runOneOff($"cd {GenerateLocationOriginal("main_branch")} && git clone " + linkType_TextBox[connectionType].Text));
                 progress.currentStep = 1;
                 saveSaveState();
@@ -587,34 +609,21 @@ namespace GithubStealthStealer
 
             if(progress.currentStep == 1)
             {
-                string[] commitShortHashes = runOneOff($"cd {Path.Combine(GenerateLocationOriginal("main_branch"), GetRepoName())} && git rev-list --abbrev-commit HEAD").Trim().Split('\n');
+                string[] commitShortHashes = runOneOff($"cd {Path.Combine(GenerateLocationOriginal("main_branch"), GetRepoName(true))} && git rev-list --abbrev-commit HEAD").Trim().Split('\n');
 
-                bool allGoodCommits = true;
                 progress.commitHashes.Clear();
                 for(int i=0; i < commitShortHashes.Length; i++)
                 {
                     if(commitShortHashes[i].Trim() != "")
                     {
-                        if(commitShortHashes[i].Trim().Length != 7)
-                        {
-                            allGoodCommits = false;
-                            Log("'" + commitShortHashes[i] + "' -- bad commit hash");
-                            progress.commitHashes.Clear();
-                            break;
-                        }
-                        else
-                        {
-                            progress.commitHashes.Add(commitShortHashes[i]);
-                        }
+                        //turns out not all commits are length 7?
+                        progress.commitHashes.Add(commitShortHashes[i]);
                     }
                 }
 
-                if (allGoodCommits)
-                {
-                    Log("commit count: " + progress.commitHashes.Count);
-                    progress.currentStep = 2;
-                    saveSaveState();
-                }
+                Log("commit count: " + progress.commitHashes.Count);
+                progress.currentStep = 2;
+                saveSaveState();
             }
 
             if(progress.currentStep == 2)
@@ -703,8 +712,8 @@ namespace GithubStealthStealer
                 return 0.0;
             }
 
-            string unixCurrent = runOneOff($"cd {Path.Combine(GenerateLocationOriginal(branch), GetRepoName())} && git show -s --format=\"%ct\" "+currentCommit);
-            string unixNext = runOneOff($"cd {Path.Combine(GenerateLocationOriginal(branch), GetRepoName())} && git show -s --format=\"%ct\" " + nextCommit);
+            string unixCurrent = runOneOff($"cd {Path.Combine(GenerateLocationOriginal(branch), GetRepoName(true))} && git show -s --format=\"%ct\" "+currentCommit);
+            string unixNext = runOneOff($"cd {Path.Combine(GenerateLocationOriginal(branch), GetRepoName(true))} && git show -s --format=\"%ct\" " + nextCommit);
 
             System.DateTime epoch = new System.DateTime(1970, 1, 1, 0, 0, 0, System.DateTimeKind.Utc);
             System.DateTime dateTimeCurrent = epoch.AddSeconds(long.Parse(unixCurrent));
@@ -754,7 +763,7 @@ namespace GithubStealthStealer
         private string GetOriginalCommitMessage(string branch, string commit)
         {
             //git show -s --format=%B COMMIT_HASH
-            return runOneOff($"cd {Path.Combine(GenerateLocationOriginal(branch), GetRepoName())} && git show -s --format=%B " + commit).Trim();
+            return runOneOff($"cd {Path.Combine(GenerateLocationOriginal(branch), GetRepoName(true))} && git show -s --format=%B " + commit).Trim();
         }
 
         private void ClearOutLog()
@@ -795,16 +804,16 @@ namespace GithubStealthStealer
 
             if (commitIndex == 0)
             {
-                if (!Directory.Exists(Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())))
+                if (!Directory.Exists(Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false))))
                 {
-                    Directory.CreateDirectory(Path.Combine(GenerateLocationClone("main_branch"), GetRepoName()));
+                    Directory.CreateDirectory(Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false)));
                 }
 
-                Log("Making project " + GetRepoName());
-                Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git init").Trim());
-                Log("Creating private GH Repo: " + GetRepoName());
+                Log("Making project " + GetRepoName(false));
+                Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false))} && git init").Trim());
+                Log("Creating private GH Repo: " + GetRepoName(false));
 
-                string myRepoUrl = runOneOff($"gh repo create {GetRepoName()} --private").Trim();
+                string myRepoUrl = runOneOff($"gh repo create {GetRepoName(false)} --private").Trim();
 
                 Log("Result: "+ myRepoUrl);
 
@@ -818,9 +827,9 @@ namespace GithubStealthStealer
                 {
                     if(myRepoUrl.IndexOf("Name already exists") != -1)
                     {
-                        Log("Deleting old repo: " + GetRepoName());
-                        Log(runOneOff($"gh repo delete {GetRepoName()} --yes").Trim());
-                        myRepoUrl = runOneOff($"gh repo create {GetRepoName()} --private").Trim();
+                        Log("Deleting old repo: " + GetRepoName(false));
+                        Log(runOneOff($"gh repo delete {GetRepoName(false)} --yes").Trim());
+                        myRepoUrl = runOneOff($"gh repo create {GetRepoName(false)} --private").Trim();
                     }
 
                     if (myRepoUrl.IndexOf("http") == 0 || myRepoUrl.IndexOf("git@") == 0)
@@ -838,8 +847,8 @@ namespace GithubStealthStealer
                 if (createdRepo)
                 {
                     Log("set branch main");
-                    Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git branch -M main").Trim());
-                    Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git remote add origin {myRepoUrl}").Trim());
+                    Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false))} && git branch -M main").Trim());
+                    Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false))} && git remote add origin {myRepoUrl}").Trim());
                 }
                 else
                 {
@@ -850,15 +859,15 @@ namespace GithubStealthStealer
             }
 
             Log("Clearing out clone folder...");
-            DeleteAllButGit(Path.Combine(GenerateLocationClone("main_branch"), GetRepoName()));
+            DeleteAllButGit(Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false)));
             Log("Setting original to: "+ progress.commitHashes[progress.commitHashes.Count - (1 + progress.commitsCopied)]);//progress.commitsCopied
-            Log(runOneOff($"cd {Path.Combine(GenerateLocationOriginal("main_branch"), GetRepoName())} && git reset --hard "+ progress.commitHashes[progress.commitHashes.Count - (1 + progress.commitsCopied)]).Trim());
+            Log(runOneOff($"cd {Path.Combine(GenerateLocationOriginal("main_branch"), GetRepoName(true))} && git reset --hard "+ progress.commitHashes[progress.commitHashes.Count - (1 + progress.commitsCopied)]).Trim());
             Log("Copying all but git to clone");
-            CopyAllButGit(Path.Combine(GenerateLocationOriginal("main_branch"), GetRepoName()), Path.Combine(GenerateLocationClone("main_branch"), GetRepoName()));
+            CopyAllButGit(Path.Combine(GenerateLocationOriginal("main_branch"), GetRepoName(true)), Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false)));
             Log("Comitting to your github...");
-            Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git add .").Trim());
-            Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git commit -m \"{textBox4.Text.Trim()}\"").Trim());
-            Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git push -u origin main").Trim());
+            Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false))} && git add .").Trim());
+            Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false))} && git commit -m \"{textBox4.Text.Trim()}\"").Trim());
+            Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName(false))} && git push -u origin main").Trim());
 
             
 
