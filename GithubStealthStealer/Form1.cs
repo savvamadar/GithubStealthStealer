@@ -134,6 +134,21 @@ namespace GithubStealthStealer
             public int currentStep = 0;
             public int commitsCopied = 0;
             public List<string> commitHashes = new List<string>();
+
+            public bool includeReadMe = true;
+
+            public bool useAutomate = false;
+
+            public float minutesLessThan = 0;
+            public float speedLessThan = 100.0f;
+
+            public float speedInbetween = 100.0f;
+
+            public float minutesMoreThan = 999999999;
+            public float speedMoreThan = 100.0f;
+
+            public int startHour = 9;
+            public int endHour = 23;
         }
 
         private bool DeleteLocalTestRepo()
@@ -141,11 +156,28 @@ namespace GithubStealthStealer
             return DeleteDir(GetRepoName());
         }
 
+        public Random rnd = new Random();
+
+        int randomStartMinute = 0;
+        int randomEndMinute = 0;
         private void Form1_Load(object sender, EventArgs e)
         {
-            
+
+            textBox5.Validating += TextBox5_Validating;
+            textBox6.Validating += TextBox6_Validating;
+            textBox7.Validating += TextBox7_Validating;
+            textBox8.Validating += TextBox8_Validating;
+            textBox9.Validating += TextBox9_Validating;
+
+            textBox10.Validating += TextBox10_Validating;
+            textBox11.Validating += TextBox11_Validating;
+
             linkType_TextBox["http"] = textBox2;
             linkType_TextBox["ssh"] = textBox3;
+
+            checkBox2.Checked = false;
+
+            checkBox2_CheckedChanged(null, null);
 
             if (!CheckGitInit())
             {
@@ -165,12 +197,42 @@ namespace GithubStealthStealer
 
             textBox1.ReadOnly = true;
 
+
+
             textBox1.Text = "";
             textBox2.Text = "";
             textBox3.Text = "";
 
             LoadSaveStateOnStart();
 
+            randomStartMinute = rnd.Next(0, 60);
+            randomEndMinute = rnd.Next(0, 59);
+            
+
+            if (progress.startHour == progress.endHour)
+            {
+                randomStartMinute = rnd.Next(0, 15);
+                randomEndMinute = rnd.Next(45, 59);
+            }
+
+
+            if (randomStartMinute < 10)
+            {
+                label17.Text = ":0" + randomStartMinute + " local time and ";
+            }
+            else
+            {
+                label17.Text = ":" + randomStartMinute + " local time and ";
+            }
+
+            if (randomEndMinute < 10)
+            {
+                label18.Text = ":0" + randomEndMinute + " local time";
+            }
+            else
+            {
+                label18.Text = ":" + randomEndMinute + " local time";
+            }
         }
 
         private bool CheckGitInit()
@@ -312,8 +374,85 @@ namespace GithubStealthStealer
             }
         }
 
+        private int GetSanitizedValue(TextBox tb, int defaultValue)
+        {
+            if (tb.Text.Trim().Length == 0)
+            {
+                return defaultValue;
+            }
+
+            try
+            {
+                return int.Parse(tb.Text);
+            }
+            catch
+            {
+                return defaultValue;
+            }
+        }
+
+        private float GetSanitizedValue(TextBox tb, float defaultValue)
+        {
+            if(tb.Text.Trim().Length == 0)
+            {
+                return defaultValue;
+            }
+
+            try
+            {
+                return float.Parse(tb.Text);
+            }
+            catch
+            {
+                return defaultValue;
+            }
+        }
+
+        private double GetSanitizedValue(TextBox tb, double defaultValue)
+        {
+            if (tb.Text.Trim().Length == 0)
+            {
+                return defaultValue;
+            }
+
+            try
+            {
+                return double.Parse(tb.Text);
+            }
+            catch
+            {
+                return defaultValue;
+            }
+        }
+
         private void saveSaveState()
         {
+            if (!enableSaveStateSaving || progress.masterLink.Trim().Length == 0)
+            {
+                return;
+            }
+
+            progress.includeReadMe = !checkBox1.Checked;
+
+            if (checkBox2.Checked)
+            {
+                progress.minutesLessThan = GetSanitizedValue(textBox5, 0.0f);
+                progress.speedLessThan = GetSanitizedValue(textBox6, 100.0f);
+
+                progress.speedInbetween = GetSanitizedValue(textBox7, 100.0f);
+
+                progress.minutesMoreThan = GetSanitizedValue(textBox9, 999999999.0f);
+                progress.speedMoreThan = GetSanitizedValue(textBox8, 100.0f);
+
+                progress.startHour = GetSanitizedValue(textBox10, 9);
+                progress.startHour = Math.Max(0, Math.Min(24, progress.startHour));
+
+                progress.endHour = GetSanitizedValue(textBox11, 23);
+                progress.endHour = Math.Max(0, Math.Min(24, progress.endHour));
+            }
+
+            progress.useAutomate = checkBox2.Checked;
+
             File.WriteAllText("save.json",JsonConvert.SerializeObject(progress));
         }
 
@@ -376,6 +515,7 @@ namespace GithubStealthStealer
             return Path.Combine(Directory.GetCurrentDirectory(), Path.Combine("clone", branch));
         }
 
+        private bool enableSaveStateSaving = false;
         private void LoadSaveStateOnStart()
         {
             loadSaveState();
@@ -390,6 +530,28 @@ namespace GithubStealthStealer
             {
                 textBox1.ReadOnly = false;
             }
+
+            checkBox1.Checked = !progress.includeReadMe;
+
+
+            textBox5.Text = progress.minutesLessThan.ToString("F2");
+            textBox6.Text = progress.speedLessThan.ToString("F2");
+
+            textBox7.Text = progress.speedInbetween.ToString("F2");
+
+            textBox9.Text = progress.minutesMoreThan.ToString("F2");
+            textBox8.Text = progress.speedMoreThan.ToString("F2");
+
+            textBox10.Text = progress.startHour.ToString("F0");
+            textBox11.Text = progress.endHour.ToString("F0");
+
+            checkBox2.Checked = progress.useAutomate;
+
+            checkBox2_CheckedChanged(null, null);
+
+            enableSaveStateSaving = true;
+
+            timer1.Enabled = true;
         }
 
         //git show -s --format="%ct" a0e2327
@@ -466,22 +628,52 @@ namespace GithubStealthStealer
         }
         //git cat-file -p 3c493c5
 
+        private string[] getCommitHashes(int index)
+        {
+            string currentCommit = "";
+            string nextCommit = "";
+
+            /*if (progress != null && progress.commitHashes != null && index >= 0)
+            {
+                if (index > 0 && (progress.commitHashes.Count - (1 + index) >= 0))
+                {
+                    nextCommit = progress.commitHashes[progress.commitHashes.Count - (1 + index)];
+                }
+
+                if (index > 0 && ((progress.commitHashes.Count - index) > 0 && (progress.commitHashes.Count - index) < progress.commitHashes.Count))
+                {
+                    currentCommit = progress.commitHashes[progress.commitHashes.Count - index];
+                }
+            }*/
+
+            if (progress != null && progress.commitHashes != null && index >= 0)
+            {
+                if (progress.commitHashes.Count - (1 + index) >= 0)
+                {
+                    nextCommit = progress.commitHashes[progress.commitHashes.Count - (1 + index)];
+                }
+
+                if (index > 0)
+                {
+                    currentCommit = progress.commitHashes[progress.commitHashes.Count - index];
+                }
+            }
+
+            return new string[] { currentCommit, nextCommit };
+        }
+
         int commitIndex = -1;
+        string[] commits = new string[] { "", "" };
         private void StageCommitIndex(int index)
         {
             commitIndex = index;
 
-            string currentCommit = "";
-            string nextCommit = "";
-            if (progress.commitHashes.Count - (1 + index) >= 0)
-            {
-                nextCommit = progress.commitHashes[progress.commitHashes.Count - (1 + index)];
-            }
+            commits = getCommitHashes(commitIndex);
 
-            if (index > 0)
-            {
-                currentCommit = progress.commitHashes[progress.commitHashes.Count - index];
-            }
+            checkBox2_CheckedChanged(null, null);
+
+            string currentCommit = commits[0];
+            string nextCommit = commits[1];
 
             UpdateUI("main_branch", currentCommit, nextCommit);
 
@@ -496,10 +688,21 @@ namespace GithubStealthStealer
                 button2.Enabled = true;
             }
 
-            //Log(CalculateTimeBetweenCommits("main_branch", progress.commitHashes[progress.commitHashes.Count-1], progress.commitHashes[progress.commitHashes.Count - 2]));
+            didFirstTimerCaclulation = false;
+            timerSecondTicksRemaining = 0;
+            isCommitting = false;
+
         }
 
-        private string CalculateTimeBetweenCommits(string branch, string currentCommit, string nextCommit) {
+        private double CalculateTimeBetweenCommits(string branch, string currentCommit, string nextCommit, string LOC) {
+
+            //Log("CTBC: " + commitIndex + " | " + currentCommit + " | " + nextCommit + " | " + LOC);
+
+            if (currentCommit == "" || nextCommit == "")
+            {
+                return 0.0;
+            }
+
             string unixCurrent = runOneOff($"cd {Path.Combine(GenerateLocationOriginal(branch), GetRepoName())} && git show -s --format=\"%ct\" "+currentCommit);
             string unixNext = runOneOff($"cd {Path.Combine(GenerateLocationOriginal(branch), GetRepoName())} && git show -s --format=\"%ct\" " + nextCommit);
 
@@ -509,7 +712,7 @@ namespace GithubStealthStealer
 
             TimeSpan difference = dateTimeNext - dateTimeCurrent;
 
-            return difference.TotalMinutes.ToString();
+            return difference.TotalMinutes;
         }
 
         private string GetCommitCount()
@@ -517,19 +720,23 @@ namespace GithubStealthStealer
             return " --- ("+(progress.commitsCopied + "/" + progress.commitHashes.Count)+") commits done";
         }
 
+        double commitTiming = 0;
         private void UpdateUI(string branch, string currentCommit, string nextCommit)
         {
             if (currentCommit == "")
             {
+                commitTiming = 0;
                 label5.Text = nextCommit + " is the first commit | " + GetCommitCount();
             }
             else if (nextCommit == "")
             {
+                commitTiming = 0;
                 label5.Text = currentCommit + " was the final commit | " + GetCommitCount();
             }
             else
             {
-                label5.Text = "It took the original author " + CalculateTimeBetweenCommits(branch, currentCommit, nextCommit) + " minutes to commit from " + currentCommit + " to " + nextCommit + " | " + GetCommitCount();
+                commitTiming = CalculateTimeBetweenCommits(branch, currentCommit, nextCommit, "UpdateUI");
+                label5.Text = "It took the original author " + commitTiming.ToString("F2") + " minutes to commit from " + currentCommit + " to " + nextCommit + " | " + GetCommitCount();
             }
 
             if (nextCommit != "")
@@ -584,7 +791,9 @@ namespace GithubStealthStealer
             ClearOutLog();
             button2.Enabled = false;
 
-            if(commitIndex == 0)
+            isCommitting = true;
+
+            if (commitIndex == 0)
             {
                 if (!Directory.Exists(Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())))
                 {
@@ -650,6 +859,7 @@ namespace GithubStealthStealer
             Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git add .").Trim());
             Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git commit -m \"{textBox4.Text.Trim()}\"").Trim());
             Log(runOneOff($"cd {Path.Combine(GenerateLocationClone("main_branch"), GetRepoName())} && git push -u origin main").Trim());
+
             
 
             progress.currentStep = 3;
@@ -661,6 +871,269 @@ namespace GithubStealthStealer
         private void textBox4_TextChanged(object sender, EventArgs e)
         {
 
+        }
+
+        private void checkBox2_CheckedChanged(object sender, EventArgs e)
+        {
+            textBox5.ReadOnly = !checkBox2.Checked;
+            textBox6.ReadOnly = !checkBox2.Checked;
+
+            textBox7.ReadOnly = !checkBox2.Checked;
+
+            textBox8.ReadOnly = !checkBox2.Checked;
+            textBox9.ReadOnly = !checkBox2.Checked;
+
+            textBox10.ReadOnly = !checkBox2.Checked;
+            textBox11.ReadOnly = !checkBox2.Checked;
+
+            if (checkBox2.Checked)
+            {
+                if (commits[1] == "")
+                {
+                    if (commits[0] == "")
+                    {
+                        if (progress.masterLink == "")
+                        {
+                            label15.Text = "Nothing to automate (yet) - Must start first";
+                        }
+                        else
+                        {
+                            label15.Text = "Uh you might as well delete everything and start again...";
+                        }
+                    }
+                    else
+                    {
+                        label15.Text = "Awaiting user cleanup";
+                    }
+                }
+            }
+            else
+            {
+                label15.Text = "Automate disabled/ paused";
+            }
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+            saveSaveState();
+        }
+
+        private void TextBox5_Validating(object sender, CancelEventArgs e)
+        {
+            progress.minutesLessThan = GetSanitizedValue(textBox5, 0.0f);
+            textBox5.Text = progress.minutesLessThan.ToString("F2");
+            if (!checkBox2.Checked)
+            {
+                return;
+            }
+            saveSaveState();
+        }
+
+        private void TextBox6_Validating(object sender, CancelEventArgs e)
+        {
+            progress.speedLessThan = GetSanitizedValue(textBox6, 100.0f);
+            textBox6.Text = progress.speedLessThan.ToString("F2");
+            if (!checkBox2.Checked)
+            {
+                return;
+            }
+            saveSaveState();
+        }
+
+        private void TextBox7_Validating(object sender, CancelEventArgs e)
+        {
+            progress.speedInbetween = GetSanitizedValue(textBox7, 100.0f);
+            textBox7.Text = progress.speedInbetween.ToString("F2");
+            if (!checkBox2.Checked)
+            {
+                return;
+            }
+            saveSaveState();
+        }
+
+        private void TextBox9_Validating(object sender, CancelEventArgs e)
+        {
+            progress.minutesMoreThan = GetSanitizedValue(textBox9, 999999999.0f);
+            textBox9.Text = progress.minutesMoreThan.ToString("F2");
+            if (!checkBox2.Checked)
+            {
+                return;
+            }
+            saveSaveState();
+        }
+
+        private void TextBox8_Validating(object sender, CancelEventArgs e)
+        {
+            progress.speedMoreThan = GetSanitizedValue(textBox8, 100.0f);
+            textBox8.Text = progress.speedMoreThan.ToString("F2");
+            if (!checkBox2.Checked)
+            {
+                return;
+            }
+            saveSaveState();
+        }
+
+        private void TextBox10_Validating(object sender, CancelEventArgs e)
+        {
+            progress.startHour = GetSanitizedValue(textBox10, 9);
+            progress.startHour = Math.Max(0, Math.Min(24, progress.startHour));
+
+            textBox10.Text = progress.startHour.ToString("F0");
+            if (!checkBox2.Checked)
+            {
+                return;
+            }
+            saveSaveState();
+        }
+
+        private void TextBox11_Validating(object sender, CancelEventArgs e)
+        {
+            progress.endHour = GetSanitizedValue(textBox11, 23);
+            progress.endHour = Math.Max(0, Math.Min(24, progress.endHour));
+
+            textBox11.Text = progress.endHour.ToString("F0");
+            if (!checkBox2.Checked)
+            {
+                return;
+            }
+            saveSaveState();
+        }
+
+        bool didFirstTimerCaclulation = false;
+        int timerSecondTicksRemaining = 0;
+
+        bool isCommitting = false;
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            if (isCommitting)
+            {
+                return;
+            }
+
+            label19.Text = " -- "+DateTime.Now.ToString("HH:mm");
+
+            string currentCommit = commits[0];
+            string nextCommit = commits[1];
+
+            
+            int cHour = int.Parse(DateTime.Now.ToString("HH"));
+            int cMinute = int.Parse(DateTime.Now.ToString("HH:mm").Split(':')[1]);
+            bool timeIsGood = false;
+
+
+            //9 & 15
+            if (progress.startHour <= progress.endHour)
+            {
+                if (progress.startHour <= cHour && cHour <= progress.endHour)
+                {
+                    if (progress.startHour == cHour)
+                    {
+                        timeIsGood = (cMinute >= randomStartMinute);
+                    }
+                    else if (progress.endHour == cHour)
+                    {
+                        timeIsGood = (cMinute <= randomEndMinute);
+                    }
+                    else
+                    {
+                        timeIsGood = true;
+                    }
+                }
+            }
+            else//15 & 9
+            {
+                if(progress.startHour <= cHour || cHour <= progress.endHour)
+                {
+                    if (progress.startHour == cHour)
+                    {
+                        timeIsGood = (cMinute >= randomStartMinute);
+                    }
+                    else if (progress.endHour == cHour)
+                    {
+                        timeIsGood = (cMinute <= randomEndMinute);
+                    }
+                    else
+                    {
+                        timeIsGood = true;
+                    }
+                }
+            }
+
+
+            if (!timeIsGood)
+            {
+                label19.Text = " --- Waiting for local time to be between limits: " + DateTime.Now.ToString("HH:mm");
+                return;
+            }
+            else
+            {
+                label19.Text = " --- local time within limit: " + DateTime.Now.ToString("HH:mm");
+            }
+
+            timerSecondTicksRemaining -= 1;
+            if (checkBox2.Checked && enableSaveStateSaving)
+            {
+                
+                label15.Text = timerSecondTicksRemaining + " seconds before auto commit";
+                if (timerSecondTicksRemaining <= 0)
+                {
+                    if (commits[1] != "")
+                    {
+                        if (didFirstTimerCaclulation)
+                        {
+                            button2_Click(null, null);
+                        }
+
+                        timerSecondTicksRemaining = Math.Max(0, (int)(commitTiming * 60.0));
+
+                        //Log("OG M: " + commitTiming);
+                        //Log("OG S: " + ((int)(commitTiming * 60.0)));
+                        Log("Calculated seconds to wait: " + timerSecondTicksRemaining);
+
+
+                        if (timerSecondTicksRemaining < (GetSanitizedValue(textBox5, 0f) * 60.0))
+                        {
+                            Log(timerSecondTicksRemaining+"s < "+ (GetSanitizedValue(textBox5, 0f) * 60.0)+"s -- using "+((GetSanitizedValue(textBox6, 100f)))+"% of the original commit time");
+                            timerSecondTicksRemaining = (int)(timerSecondTicksRemaining * (GetSanitizedValue(textBox6, 100f) / 100.0));
+                        }
+                        else if (timerSecondTicksRemaining > (GetSanitizedValue(textBox9, 999999999f) * 60.0))
+                        {
+                            Log(timerSecondTicksRemaining + "s > " + (GetSanitizedValue(textBox9, 999999999f) * 60.0) + "s -- using " + ((GetSanitizedValue(textBox8, 100f))) + "% of the original commit time");
+                            timerSecondTicksRemaining = (int)(timerSecondTicksRemaining * (GetSanitizedValue(textBox8, 100f) / 100.0));
+                        }
+                        else
+                        {
+                            Log("ELSE -- using " + ((GetSanitizedValue(textBox7, 100f))) + "% of the original commit time");
+                            timerSecondTicksRemaining = (int)(timerSecondTicksRemaining * (GetSanitizedValue(textBox7, 100f) / 100.0));
+                        }
+
+                        timerSecondTicksRemaining = Math.Max(rnd.Next(2, 14), timerSecondTicksRemaining);
+
+                        Log("Actual seconds to wait: " + timerSecondTicksRemaining);
+
+                        didFirstTimerCaclulation = true;
+                    }
+                    else
+                    {
+                        if (currentCommit == "")
+                        {
+                            if (progress.masterLink == "")
+                            {
+                                label15.Text = "Nothing to automate (yet) - Must start first";
+                            }
+                            else
+                            {
+                                label15.Text = "Uh you might as well delete everything and start again...";
+                            }
+                        }
+                        else
+                        {
+                            label15.Text = "No further commits available";
+                        }
+                    }
+                }
+            }
         }
     }
 }
